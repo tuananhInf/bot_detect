@@ -1,25 +1,20 @@
-# Sử dụng Node.js làm base image
-FROM node:20
+# Base image
+FROM node:18
 
-# Tạo thư mục ứng dụng
+# Create app directory
 WORKDIR /usr/src/app
 
-# Sao chép package.json và package-lock.json (nếu có)
+# A wildcard is used to ensure both package.json AND package-lock.json are copied
 COPY package*.json ./
 
-# Cài đặt dependencies
+# Install app dependencies
 RUN npm install
 
-# Sao chép source code của ứng dụng
+# Bundle app source
 COPY . .
 
-# Build ứng dụng
+# Creates a "dist" folder with the production build
 RUN npm run build
 
-COPY . .
-
-# Mở port mà ứng dụng sẽ chạy
-EXPOSE 3000
-
-# Chạy ứng dụng
+# Start the server using the production build
 CMD [ "node", "dist/main.js" ]
