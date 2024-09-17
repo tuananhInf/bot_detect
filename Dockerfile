@@ -13,7 +13,9 @@ COPY . .
 
 RUN npm install
 
+RUN npm install -g @nestjs/cli
 
+COPY . .
 
 # Mở cổng 5000 cho ứng dụng NestJS
 EXPOSE 3000
