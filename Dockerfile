@@ -1,21 +1,22 @@
-# Base image
+# Sử dụng hình ảnh cơ sở Node.js
 FROM node:18
 
-# Create app directory
+# Thiết lập thư mục làm việc
 WORKDIR /usr/src/app
 
-# A wildcard is used to ensure both package.json AND package-lock.json are copied
-COPY package*.json ./
+# Sao chép package.json và package-lock.json (nếu có) vào thư mục làm việc
+COPY package*.json /usr/src/app
 
-# Install app dependencies
+# Sao chép mã nguồn ứng dụng vào thư mục làm việc
+
+COPY . .
+
 RUN npm install
 
-# Bundle app source
-COPY . .
 
-# Creates a "dist" folder with the production build
-RUN npm run build
-COPY . .
 
-# Start the server using the production build
-CMD [ "npm", "run", "start:dev" ]
+# Mở cổng 5000 cho ứng dụng NestJS
+EXPOSE 3000
+
+# Khởi chạy ứng dụng NestJS
+CMD ["npm", "run", "start"]
