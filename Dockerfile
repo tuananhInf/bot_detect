@@ -16,6 +16,8 @@ COPY . .
 # Build ứng dụng
 RUN npm run build
 
+COPY . .
+
 # Mở port mà ứng dụng sẽ chạy
 EXPOSE 3000
 
