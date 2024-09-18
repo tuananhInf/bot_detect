@@ -212,13 +212,14 @@ export class AppService {
                           this.signers[signer]['timestamp'] <
                             transaction['trans_time']
                         ) {
+                          const txs = this.signers[signer].push(
+                            transaction['txHash'],
+                          );
                           this.signers[signer] = {
                             timestamp: tx['trans_time'],
                             profit: (this.signers[signer] + profit) * price,
                             token: mintSymbol,
-                            transactions: this.signers[signer].push(
-                              transaction['txHash'],
-                            ),
+                            transactions: txs,
                             price: price,
                             count: this.signers[signer]['count'] + 1,
                           };
