@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import axios, { AxiosRequestConfig } from 'axios';
 import { HttpsProxyAgent } from 'https-proxy-agent';
 import { Cron } from '@nestjs/schedule';
+import { json } from 'express';
 @Injectable()
 export class AppService {
   private baseUrl: string = 'https://api-v2.solscan.io/v2';
@@ -103,7 +104,7 @@ export class AppService {
     }
   }
 
-  // @Cron('0 */12 * * * *')
+  @Cron('0 */12 * * * *')
   async detectBot(): Promise<any> {
     console.log('cron');
     try {
@@ -137,14 +138,15 @@ export class AppService {
                     tx['render_summary_main_actions'],
                   );
                   if (this.processSwapAction(actionFirst, actionLast)) {
-                    if (Array.isArray(tx['signers'])) {
-                      for (const signer of tx['signers']) {
+                    if (Array.isArray(tx['signer'])) {
+                      for (const signer of tx['signer']) {
                         if (this.signers[signer]) {
                           this.signers[signer]++;
                         } else {
                           this.signers[signer] = 1;
                         }
                       }
+                      console.log('Transaction fit :', transaction['txHash']);
                       this.sendDataToEndpoint(this.signers);
                     }
 
