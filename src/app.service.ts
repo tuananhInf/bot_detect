@@ -7,6 +7,12 @@ export class AppService {
   private baseUrl: string = 'https://api-v2.solscan.io/v2';
   private config: AxiosRequestConfig;
   private signers = {};
+  private timeStart: number;
+  private timeEnd: number;
+  constructor() {
+    this.timeStart = Date.now(); // Thời điểm hiện tại
+    this.timeEnd = this.timeStart + 24 * 60 * 60 * 1000; // 24 giờ sau đó
+  }
   private async makeRequest<T>(url: string, param: string): Promise<T> {
     const maxRetries = 5;
     let retries = 0;
@@ -105,6 +111,10 @@ export class AppService {
 
   @Cron('0 */9 * * * *')
   async detectBot(): Promise<any> {
+    const timeCurent = Date.now();
+    if (timeCurent > this.timeEnd) {
+      return;
+    }
     try {
       const lastBlocks = await this.getLastBlock();
 
