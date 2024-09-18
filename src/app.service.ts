@@ -6,7 +6,7 @@ import { Cron } from '@nestjs/schedule';
 export class AppService {
   private baseUrl: string = 'https://api-v2.solscan.io/v2';
   private config: AxiosRequestConfig;
-
+  private signers = {};
   private async makeRequest<T>(url: string, param: string): Promise<T> {
     const maxRetries = 5;
     let retries = 0;
@@ -103,18 +103,20 @@ export class AppService {
     }
   }
 
-  @Cron('0 */12 * * * *')
+  // @Cron('0 */12 * * * *')
   async detectBot(): Promise<any> {
     console.log('cron');
     try {
       const lastBlocks = await this.getLastBlock();
-      const signers = {};
+
       for (const block of lastBlocks) {
         try {
           const transactions = await this.getBlockTransactions(
             block.currentSlot,
           );
-          console.log('block: ', block.currentSlot);
+          console.log(
+            `block number ${block.currentSlot} in range [ ${lastBlocks[0].currentSlot} to ${lastBlocks[lastBlocks.length - 1].currentSlot} ]`,
+          );
           for (const transaction of transactions) {
             for (const ins of transaction['parsedInstruction']) {
               // condition 1: Instruction Type
@@ -123,6 +125,7 @@ export class AppService {
                   ins['type'],
                 )
               ) {
+                console.log('transaction hash', transaction['txHash']);
                 const tx = await this.getTransactionDetail(
                   transaction['txHash'],
                 );
@@ -136,12 +139,13 @@ export class AppService {
                   if (this.processSwapAction(actionFirst, actionLast)) {
                     if (Array.isArray(tx['signers'])) {
                       for (const signer of tx['signers']) {
-                        if (signers[signer]) {
-                          signers[signer]++;
+                        if (this.signers[signer]) {
+                          this.signers[signer]++;
                         } else {
-                          signers[signer] = 1;
+                          this.signers[signer] = 1;
                         }
                       }
+                      this.sendDataToEndpoint(this.signers);
                     }
 
                     break;
@@ -155,7 +159,7 @@ export class AppService {
         }
       }
 
-      await this.sendDataToEndpoint(signers);
+      console.log('Success detected bot');
     } catch (error) {
       console.error('Error in bot detection:', error);
     }
@@ -163,7 +167,7 @@ export class AppService {
 
   private async sendDataToEndpoint(data: any): Promise<void> {
     const endpoint =
-      'https://script.google.com/macros/s/AKfycbxJ67F-Vc-hZRORDD2d6DGvz9Ntyb0151jyLtZa24oq_mZ5wb8XYoltVoLO3Yqrog/exec';
+      'https://script.google.com/macros/s/AKfycbzPUpFPQQR5sZi5vfDSd5QX5WsWOkMz45sJOfZG2TqCtv0tXfXO1h7mUTQ_seINIo4/exec';
 
     try {
       const response = await fetch(endpoint, {
