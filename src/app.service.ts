@@ -4,8 +4,6 @@ import { HttpsProxyAgent } from 'https-proxy-agent';
 import * as fs from 'fs';
 import * as path from 'path';
 import { Cron } from '@nestjs/schedule';
-@Injectable()
-
 interface BotData {
   [key: string]: {
     timestamp: number;
@@ -15,6 +13,7 @@ interface BotData {
     count: number;
   };
 }
+@Injectable()
 export class AppService {
   private baseUrl: string = 'https://api-v2.solscan.io/v2';
   private config: AxiosRequestConfig;
@@ -143,7 +142,10 @@ export class AppService {
   async detectBot(): Promise<any> {
     const timeCurent = Date.now();
     if (timeCurent > this.timeEnd) {
-      this.saveBotDataToCSV(this.signers,`bots_report_from_${this.timeStart}_to_${this.timeEnd}`)
+      this.saveBotDataToCSV(
+        this.signers,
+        `bots_report_from_${this.timeStart}_to_${this.timeEnd}`,
+      );
       this.timeStart = timeCurent;
       this.timeEnd = this.timeStart + 24 * 60 * 60 * 1000;
     }
