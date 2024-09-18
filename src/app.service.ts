@@ -220,7 +220,7 @@ export class AppService {
                               transaction['txHash'],
                             ),
                             price: price,
-                            count: this.signers[signer]['count']++,
+                            count: this.signers[signer]['count'] + 1,
                           };
                         } else {
                           this.signers[signer] = {
