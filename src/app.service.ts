@@ -8,30 +8,43 @@ export class AppService {
   private config: AxiosRequestConfig;
 
   private async makeRequest<T>(url: string, param: string): Promise<T> {
+    const maxRetries = 5;
+    let retries = 0;
     this.config = {};
-    const proxyUrl =
-      'http://diemmy889980:gfH7y83JrjC7zrw8_country-Canada@proxy.packetstream.io:31112';
-    if (proxyUrl) {
-      this.config.httpsAgent = new HttpsProxyAgent(proxyUrl);
-      this.config.proxy = false; // Disable axios' default proxy handling
-    }
-    const headers = {
-      'Content-Type': 'gzip, deflate, br',
-      Origin: 'https://solscan.io',
-    };
-    if (headers) {
-      this.config.headers = headers;
-    }
-    const config: AxiosRequestConfig = {
-      ...this.config,
-    };
-    url += param;
+    while (retries < maxRetries) {
+      try {
+        const proxyUrl =
+          'http://diemmy889980:gfH7y83JrjC7zrw8_country-UnitedStates@proxy.packetstream.io:31112';
+        if (proxyUrl) {
+          this.config.httpsAgent = new HttpsProxyAgent(proxyUrl);
+          this.config.proxy = false; // Disable axios' default proxy handling
+          this.config.timeout = 10000;
+        }
+        const headers = {
+          'Content-Type': 'gzip, deflate, br',
+          Origin: 'https://solscan.io',
+        };
+        if (headers) {
+          this.config.headers = headers;
+        }
+        const config: AxiosRequestConfig = {
+          ...this.config,
+        };
 
-    try {
-      const response = await axios.get(url, config);
-      return response.data.data;
-    } catch (error) {
-      throw error;
+        try {
+          const response = await axios.get(url + param, config);
+          return response.data.data;
+        } catch (error) {
+          throw error;
+        }
+      } catch (error) {
+        console.log(error);
+        console.log('retry', retries);
+        retries++;
+      }
+    }
+    if (retries === maxRetries) {
+      console.error('Max retries reached. Could not complete bot detection.');
     }
   }
 
@@ -92,6 +105,7 @@ export class AppService {
 
   @Cron('0 */12 * * * *')
   async detectBot(): Promise<any> {
+    console.log('cron');
     try {
       const lastBlocks = await this.getLastBlock();
       const signers = {};
@@ -112,18 +126,24 @@ export class AppService {
                 const tx = await this.getTransactionDetail(
                   transaction['txHash'],
                 );
-                if (tx['render_summary_main_actions']) {
+                if (
+                  Array.isArray(tx['render_summary_main_actions']) &&
+                  tx['render_summary_main_actions']
+                ) {
                   const { actionFirst, actionLast } = this.getActionsSwap(
                     tx['render_summary_main_actions'],
                   );
                   if (this.processSwapAction(actionFirst, actionLast)) {
-                    for (const signer of tx['signers']) {
-                      if (signers[signer]) {
-                        signers[signer]++;
-                      } else {
-                        signers[signer] = 1;
+                    if (Array.isArray(tx['signers'])) {
+                      for (const signer of tx['signers']) {
+                        if (signers[signer]) {
+                          signers[signer]++;
+                        } else {
+                          signers[signer] = 1;
+                        }
                       }
                     }
+
                     break;
                   }
                 }
@@ -131,7 +151,7 @@ export class AppService {
             }
           }
         } catch (e) {
-          console.log('Error request');
+          console.log('Error request', e);
         }
       }
 
