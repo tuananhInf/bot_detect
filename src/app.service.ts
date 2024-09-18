@@ -2,7 +2,6 @@ import { Injectable } from '@nestjs/common';
 import axios, { AxiosRequestConfig } from 'axios';
 import { HttpsProxyAgent } from 'https-proxy-agent';
 import { Cron } from '@nestjs/schedule';
-import { json } from 'express';
 @Injectable()
 export class AppService {
   private baseUrl: string = 'https://api-v2.solscan.io/v2';
@@ -104,9 +103,8 @@ export class AppService {
     }
   }
 
-  @Cron('0 */12 * * * *')
+  @Cron('0 */9 * * * *')
   async detectBot(): Promise<any> {
-    console.log('cron');
     try {
       const lastBlocks = await this.getLastBlock();
 
@@ -140,10 +138,47 @@ export class AppService {
                   if (this.processSwapAction(actionFirst, actionLast)) {
                     if (Array.isArray(tx['signer'])) {
                       for (const signer of tx['signer']) {
-                        if (this.signers[signer]) {
-                          this.signers[signer]++;
+                        const fee =
+                          transaction['fee'] != 0
+                            ? transaction['fee'] / 10 ** 9
+                            : 1;
+                        const revenue =
+                          (actionLast['number'] - actionFirst['number']) /
+                          10 ** actionFirst['decimals'];
+                        const profit = revenue - fee;
+                        const token_address = actionFirst['token_address'];
+                        const priceData = await this.makeRequest<any>(
+                          `https://price.jup.ag/v4/price?ids=`,
+                          token_address,
+                        );
+                        let mintSymbol = '';
+                        let price = 0;
+                        for (const key in priceData) {
+                          if (priceData.hasOwnProperty(key)) {
+                            mintSymbol = priceData[key].mintSymbol;
+                            price = priceData[key].price;
+                          }
+                        }
+                        if (
+                          this.signers[signer] &&
+                          this.signers[signer]['timestamp'] <
+                            transaction['trans_time']
+                        ) {
+                          this.signers[signer] = {
+                            timestamp: tx['trans_time'],
+                            profit: (this.signers[signer] + profit) * price,
+                            token: mintSymbol,
+                            price: price,
+                            count: this.signers[signer]['count']++,
+                          };
                         } else {
-                          this.signers[signer] = 1;
+                          this.signers[signer] = {
+                            timestamp: tx['trans_time'],
+                            profit: profit * price,
+                            token: mintSymbol,
+                            price: price,
+                            count: 1,
+                          };
                         }
                       }
                       console.log('Transaction fit :', transaction['txHash']);
@@ -168,8 +203,9 @@ export class AppService {
   }
 
   private async sendDataToEndpoint(data: any): Promise<void> {
+    console.log(data);
     const endpoint =
-      'https://script.google.com/macros/s/AKfycbzPUpFPQQR5sZi5vfDSd5QX5WsWOkMz45sJOfZG2TqCtv0tXfXO1h7mUTQ_seINIo4/exec';
+      'https://script.google.com/macros/s/AKfycbxxkkb6_46GuDKN669Yjn4waSjRF7aQSkX3rI8d_Ee8ZU5TSQvbxd0Sderd1evvX1Y/exec';
 
     try {
       const response = await fetch(endpoint, {
@@ -181,9 +217,8 @@ export class AppService {
       });
 
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(`HTTP error! status: ${response}`);
       }
-
       const result = await response.json();
       console.log('Data sent successfully:', result);
     } catch (error) {
