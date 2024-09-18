@@ -6,6 +6,7 @@ import * as path from 'path';
 import { Cron } from '@nestjs/schedule';
 interface BotData {
   [key: string]: {
+    transactions: string;
     timestamp: number;
     profit: number;
     token: string;
@@ -122,11 +123,14 @@ export class AppService {
 
   saveBotDataToCSV(data: BotData, fileName: string = 'bot_data.csv'): void {
     // Tạo header cho file CSV
-    const header = 'bot_id,profit,count\n';
+    const header = 'bot_id,profit,count_tx,transactions\n';
 
     // Chuyển đổi dữ liệu thành format CSV
     const csvContent = Object.entries(data).reduce((acc, [bot_id, botInfo]) => {
-      return acc + `${bot_id},${botInfo.profit},${botInfo.count}\n`;
+      return (
+        acc +
+        `${bot_id},${botInfo.profit},${botInfo.count},${JSON.stringify(botInfo.transactions)}\n`
+      );
     }, header);
 
     // Tạo đường dẫn đầy đủ cho file
@@ -212,6 +216,9 @@ export class AppService {
                             timestamp: tx['trans_time'],
                             profit: (this.signers[signer] + profit) * price,
                             token: mintSymbol,
+                            transactions: this.signers[signer].push(
+                              transaction['txHash'],
+                            ),
                             price: price,
                             count: this.signers[signer]['count']++,
                           };
@@ -220,6 +227,7 @@ export class AppService {
                             timestamp: tx['trans_time'],
                             profit: profit * price,
                             token: mintSymbol,
+                            transactions: [transaction['txHash']],
                             price: price,
                             count: 1,
                           };
@@ -227,6 +235,10 @@ export class AppService {
                       }
                       console.log('Transaction fit :', transaction['txHash']);
                       this.sendDataToEndpoint(this.signers);
+                      this.saveBotDataToCSV(
+                        this.signers,
+                        `bot_data_${Date.now()}`,
+                      );
                     }
 
                     break;
