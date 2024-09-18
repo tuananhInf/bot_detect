@@ -1,8 +1,20 @@
 import { Injectable } from '@nestjs/common';
 import axios, { AxiosRequestConfig } from 'axios';
 import { HttpsProxyAgent } from 'https-proxy-agent';
+import * as fs from 'fs';
+import * as path from 'path';
 import { Cron } from '@nestjs/schedule';
 @Injectable()
+
+interface BotData {
+  [key: string]: {
+    timestamp: number;
+    profit: number;
+    token: string;
+    price: number;
+    count: number;
+  };
+}
 export class AppService {
   private baseUrl: string = 'https://api-v2.solscan.io/v2';
   private config: AxiosRequestConfig;
@@ -109,11 +121,31 @@ export class AppService {
     }
   }
 
+  saveBotDataToCSV(data: BotData, fileName: string = 'bot_data.csv'): void {
+    // Tạo header cho file CSV
+    const header = 'bot_id,profit,count\n';
+
+    // Chuyển đổi dữ liệu thành format CSV
+    const csvContent = Object.entries(data).reduce((acc, [bot_id, botInfo]) => {
+      return acc + `${bot_id},${botInfo.profit},${botInfo.count}\n`;
+    }, header);
+
+    // Tạo đường dẫn đầy đủ cho file
+    const filePath = path.join(process.cwd(), fileName);
+
+    // Ghi dữ liệu vào file
+    fs.writeFileSync(filePath, csvContent, 'utf-8');
+
+    console.log(`CSV file has been saved to ${filePath}`);
+  }
+
   @Cron('0 */9 * * * *')
   async detectBot(): Promise<any> {
     const timeCurent = Date.now();
     if (timeCurent > this.timeEnd) {
-      return;
+      this.saveBotDataToCSV(this.signers,`bots_report_from_${this.timeStart}_to_${this.timeEnd}`)
+      this.timeStart = timeCurent;
+      this.timeEnd = this.timeStart + 24 * 60 * 60 * 1000;
     }
     try {
       const lastBlocks = await this.getLastBlock();
