@@ -205,7 +205,7 @@ export class AppService {
   private async sendDataToEndpoint(data: any): Promise<void> {
     console.log(data);
     const endpoint =
-      'https://script.google.com/macros/s/AKfycbxgKhvLfn3IffwZ-5lnD_OT0wTvg9DQNjcZ1xpNGBmX_gTnOToiMtRA3GehUZTcaJ6i/exec';
+      'https://script.google.com/macros/s/AKfycbxM5xwT4uPpMR3zyoJkoou_sxPpi6MnKgizsruvSIkRSpIjrg0ibW4zDlK-3Df45Pjz/exec';
 
     try {
       const response = await fetch(endpoint, {
