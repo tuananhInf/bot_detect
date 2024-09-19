@@ -209,8 +209,7 @@ export class AppService {
                         }
                         if (
                           this.signers[signer] &&
-                          this.signers[signer]['timestamp'] <
-                            transaction['trans_time']
+                          this.signers[signer]['timestamp'] < tx['trans_time']
                         ) {
                           const txs = this.signers[signer].push(
                             transaction['txHash'],
