@@ -1,43 +1,67 @@
 import { Injectable } from '@nestjs/common';
 import axios, { AxiosRequestConfig } from 'axios';
-import { HttpsProxyAgent } from 'https-proxy-agent';
 import * as fs from 'fs';
 import * as path from 'path';
 import { Cron } from '@nestjs/schedule';
+import { HttpsProxyAgent } from 'https-proxy-agent';
+import { HttpProxyAgent } from 'http-proxy-agent';
 interface BotData {
-  [key: string]: {
-    transactions: string;
-    timestamp: number;
-    profit: number;
-    token: string;
-    price: number;
-    count: number;
-  };
+  bot_id: string;
+  tx_hash: string;
+  profit: number;
+  token_name: string;
 }
 @Injectable()
 export class AppService {
   private baseUrl: string = 'https://api-v2.solscan.io/v2';
   private config: AxiosRequestConfig;
-  private signers = {};
+  private transactionBots = [];
   private timeStart: number;
   private timeEnd: number;
+  private i = 0;
   constructor() {
     this.timeStart = Date.now(); // Thời điểm hiện tại
     this.timeEnd = this.timeStart + 24 * 60 * 60 * 1000; // 24 giờ sau đó
   }
+
+  getRandomIp(filePath: string): string {
+    try {
+      // Đọc nội dung của file
+      const fileContent: string = fs.readFileSync(filePath, 'utf-8');
+
+      // Tách nội dung thành mảng các dòng
+      const lines: string[] = fileContent
+        .split('\n')
+        .filter((line) => line.trim() !== '');
+
+      // Kiểm tra xem có dòng nào không
+      if (lines.length === 0) {
+        throw new Error('File is empty');
+      }
+
+      // Chọn ngẫu nhiên một dòng
+      const randomIndex: number = Math.floor(Math.random() * lines.length);
+      return lines[randomIndex].trim();
+    } catch (error) {
+      console.error('Error reading file:', error);
+      return '';
+    }
+  }
+
   private async makeRequest<T>(url: string, param: string): Promise<T> {
-    const maxRetries = 5;
+    const maxRetries = 300;
     let retries = 0;
     this.config = {};
+    this.i = this.i + 1;
+    console.log('request time:', this.i);
     while (retries < maxRetries) {
       try {
-        const proxyUrl =
-          'http://diemmy889980:gfH7y83JrjC7zrw8_country-UnitedStates@proxy.packetstream.io:31112';
-        if (proxyUrl) {
-          this.config.httpsAgent = new HttpsProxyAgent(proxyUrl);
-          this.config.proxy = false; // Disable axios' default proxy handling
-          this.config.timeout = 10000;
-        }
+        this.config.timeout = 50000;
+        // const ip = this.getRandomIp('list_ip.txt');
+        const proxy = `http://diemmy889980:gfH7y83JrjC7zrw8_country-UnitedStates@proxy.packetstream.io:31112`;
+        const httpAgent = new HttpProxyAgent(proxy);
+        const httpsAgent = new HttpsProxyAgent(proxy);
+        process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
         const headers = {
           'Content-Type': 'gzip, deflate, br',
           Origin: 'https://solscan.io',
@@ -50,11 +74,33 @@ export class AppService {
         };
 
         try {
-          const response = await axios.get(url + param, config);
+          const response = await axios({
+            url: url + param,
+            ...config,
+            httpAgent,
+            httpsAgent,
+            method: 'GET',
+          });
           return response.data.data;
         } catch (error) {
           throw error;
         }
+        // try {
+        //   const apikey = 'fed3021a09dbf0c707a2c5c4a4e667a4c18efc05';
+        //   const response = await axios.get('https://api.zenrows.com/v1/', {
+        //     params: {
+        //       url: url + param,
+        //       apikey: apikey,
+        //       js_render: 'true',
+        //       js_instructions: `[{"click":".selector"},{"wait":500},{"fill":[".input","value"]},{"wait_for":".slow_selector"}]`,
+        //       autoparse: 'true',
+        //     },
+        //   });
+        //   console.log('data', response.data.data);
+        //   return response.data.data;
+        // } catch (error) {
+        //   throw error;
+        // }
       } catch (error) {
         console.log(error);
         console.log('retry', retries);
@@ -67,6 +113,7 @@ export class AppService {
   }
 
   async getLastBlock(): Promise<any> {
+    console.log('get block last');
     return this.makeRequest<any[]>(`${this.baseUrl}/block/last`, '');
   }
 
@@ -121,33 +168,56 @@ export class AppService {
     }
   }
 
-  saveBotDataToCSV(data: BotData, fileName: string = 'bot_data.csv'): void {
-    // Tạo header cho file CSV
-    const header = 'bot_id,profit,count_tx,transactions\n';
+  saveBotDataToCSV(
+    data: BotData[],
+    fileName: string = 'bot_data',
+    folderName: string = '.',
+  ): void {
+    // Đảm bảo fileName có đuôi .csv
+    const fileNameWithExtension = fileName.endsWith('.csv')
+      ? fileName
+      : `${fileName}.csv`;
 
-    // Chuyển đổi dữ liệu thành format CSV
-    const csvContent = Object.entries(data).reduce((acc, [bot_id, botInfo]) => {
+    // Tạo header cho file CSV
+    const header = 'bot_id,tx_hash,profit,token_name\n';
+
+    const csvContent = data.reduce((acc, transaction) => {
       return (
         acc +
-        `${bot_id},${botInfo.profit},${botInfo.count},${JSON.stringify(botInfo.transactions)}\n`
+        `${transaction.bot_id},${transaction.tx_hash},${transaction.profit},${transaction.token_name}\n`
       );
     }, header);
 
-    // Tạo đường dẫn đầy đủ cho file
-    const filePath = path.join(process.cwd(), fileName);
+    // Tạo đường dẫn đầy đủ cho thư mục và file
+    const directory = path.join(process.cwd(), folderName);
+    const filePath = path.join(directory, fileNameWithExtension);
 
-    // Ghi dữ liệu vào file
-    fs.writeFileSync(filePath, csvContent, 'utf-8');
+    // Kiểm tra và tạo thư mục nếu nó không tồn tại
+    if (!fs.existsSync(directory)) {
+      try {
+        fs.mkdirSync(directory, { recursive: true });
+        console.log(`Directory created: ${directory}`);
+      } catch (error) {
+        console.error(`Error creating directory: ${error}`);
+        return; // Kết thúc quá trình nếu không thể tạo thư mục
+      }
+    }
 
-    console.log(`CSV file has been saved to ${filePath}`);
+    try {
+      // Ghi dữ liệu vào file
+      fs.writeFileSync(filePath, csvContent, 'utf-8');
+      console.log(`CSV file has been saved to ${filePath}`);
+    } catch (error) {
+      console.error(`Error writing file: ${error}`);
+    }
   }
 
-  @Cron('0 */9 * * * *')
+  // @Cron('0 */9 * * * *')
   async detectBot(): Promise<any> {
     const timeCurent = Date.now();
     if (timeCurent > this.timeEnd) {
       this.saveBotDataToCSV(
-        this.signers,
+        this.transactionBots,
         `bots_report_from_${this.timeStart}_to_${this.timeEnd}`,
       );
       this.timeStart = timeCurent;
@@ -207,37 +277,30 @@ export class AppService {
                             price = priceData[key].price;
                           }
                         }
-                        if (
-                          this.signers[signer] &&
-                          this.signers[signer]['timestamp'] < tx['trans_time']
-                        ) {
-                          const txs = this.signers[signer].push(
-                            transaction['txHash'],
-                          );
-                          this.signers[signer] = {
-                            timestamp: tx['trans_time'],
-                            profit: (this.signers[signer] + profit) * price,
-                            token: mintSymbol,
-                            transactions: txs,
-                            price: price,
-                            count: this.signers[signer]['count'] + 1,
-                          };
-                        } else {
-                          this.signers[signer] = {
-                            timestamp: tx['trans_time'],
+                        let check = true;
+                        for (const transactionSaved of this.transactionBots) {
+                          if (
+                            transactionSaved['tx_hash'] ===
+                            transaction['txHash']
+                          ) {
+                            check = false;
+                          }
+                        }
+                        if (check) {
+                          this.transactionBots.push({
+                            bot_id: signer,
                             profit: profit * price,
-                            token: mintSymbol,
-                            transactions: [transaction['txHash']],
-                            price: price,
-                            count: 1,
-                          };
+                            tx_hash: transaction['txHash'],
+                            token_name: mintSymbol,
+                          });
                         }
                       }
                       console.log('Transaction fit :', transaction['txHash']);
-                      this.sendDataToEndpoint(this.signers);
+                      // this.sendDataToEndpoint(this.transactionBots);
                       this.saveBotDataToCSV(
-                        this.signers,
-                        `bot_data_${Date.now()}`,
+                        this.transactionBots,
+                        `transaction_bot_${Date.now()}`,
+                        'data_detect_bot',
                       );
                     }
 
