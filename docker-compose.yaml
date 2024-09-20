@@ -10,3 +10,4 @@ services:
     container_name: bot_detect
     volumes:
       - .:/usr/src/app
+      - /usr/src/app/node_modules

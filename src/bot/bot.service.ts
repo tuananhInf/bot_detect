@@ -266,7 +266,7 @@ export class BotService {
               continue;
             }
             const txHash = transaction?.transaction?.signatures[0];
-            if (signer) {
+            if (signer && balanceChange.length > 0) {
               this.bot_data.push({
                 bot_id: signer,
                 tx_hash: txHash,
