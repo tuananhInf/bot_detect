@@ -281,7 +281,7 @@ export class AppService {
                         for (const transactionSaved of this.transactionBots) {
                           if (
                             transactionSaved['tx_hash'] ===
-                            transaction['txHash']
+                            transaction['txHash'] && transactionSaved['bot_id'] === signer
                           ) {
                             check = false;
                           }

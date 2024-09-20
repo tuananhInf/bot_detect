@@ -8,3 +8,6 @@ services:
     ports:
       - '3000:3000' # expose-to-the-world : only-in-the-docker
     container_name: bot_detect
+    volumes:
+      - ./data_detect_bot:/usr/src/app/data_detect_bot
+      - bot_data_profit:/usr/src/app/bot_data_profit
