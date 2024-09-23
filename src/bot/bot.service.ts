@@ -138,6 +138,7 @@ export class BotService {
       });
       return { block: block };
     } catch (e) {
+      console.log('e', e);
       throw e;
     }
   }
@@ -147,47 +148,38 @@ export class BotService {
   }
 
   saveBotDataToCSV(
-    data: any[],
+    data: any,
     fileName: string = 'bot_data',
-    folderName: string = '.',
+    folderName: string = 'data_detect',
   ): void {
     // Đảm bảo fileName có đuôi .csv
     const fileNameWithExtension = fileName.endsWith('.csv')
       ? fileName
       : `${fileName}.csv`;
-
-    // Tạo header cho file CSV
-    const header = 'bot_id,tx_hash,fee\n';
-
-    const csvContent = data.reduce((acc, transaction) => {
-      return (
-        acc +
-        `${transaction.bot_id},${transaction.tx_hash},${transaction.fee}\n`
-      );
-    }, header);
-
-    // Tạo đường dẫn đầy đủ cho thư mục và file
     const directory = path.join(process.cwd(), folderName);
     const filePath = path.join(directory, fileNameWithExtension);
 
-    // Kiểm tra và tạo thư mục nếu nó không tồn tại
+    // Tạo thư mục nếu nó không tồn tại
     if (!fs.existsSync(directory)) {
       try {
         fs.mkdirSync(directory, { recursive: true });
-        console.log(`Directory created: ${directory}`);
       } catch (error) {
         console.error(`Error creating directory: ${error}`);
-        return; // Kết thúc quá trình nếu không thể tạo thư mục
+        return;
       }
     }
 
-    try {
-      // Ghi dữ liệu vào file
-      fs.writeFileSync(filePath, csvContent, 'utf-8');
-      // console.log(`CSV file has been saved to ${filePath}`);
-    } catch (error) {
-      console.error(`Error writing file: ${error}`);
+    // Tạo file với header nếu nó chưa tồn tại
+    if (!fs.existsSync(filePath)) {
+      const header = 'bot_id,tx_hash,fee\n';
+      fs.writeFileSync(filePath, header, 'utf-8');
     }
+
+    // Tạo dòng dữ liệu mới
+    const newRow = `${data.bot_id},${data.tx_hash},${data.fee}\n`;
+
+    // Thêm dòng mới vào cuối file
+    fs.appendFileSync(filePath, newRow, 'utf-8');
   }
 
   getConnect() {
@@ -197,20 +189,35 @@ export class BotService {
   }
 
   saveJsonFile(filename, data) {
-    return new Promise((resolve, reject) => {
-      const jsonData = JSON.stringify(data, null, 2);
+    return new Promise<void>((resolve, reject) => {
+      // Đọc file hiện có hoặc tạo một mảng trống nếu file không tồn tại
+      let existingData = [];
+      if (fs.existsSync(filename)) {
+        const fileContent = fs.readFileSync(filename, 'utf8');
+        existingData = JSON.parse(fileContent);
+      }
+
+      // Thêm dữ liệu mới vào mảng
+      existingData.push(data);
+
+      // Ghi lại toàn bộ mảng vào file
+      const jsonData = JSON.stringify(existingData, null, 2);
       fs.writeFile(filename, jsonData, 'utf8', (err) => {
         if (err) {
           reject(err);
         } else {
-          resolve('File JSON đã được lưu thành công');
+          resolve();
         }
       });
     });
   }
 
   // @Cron('*/1 * * * * *')
-  async getData(blockOldNumber = 289383128) {
+  async getData(blockOldNumber?) {
+    if (!blockOldNumber) {
+      blockOldNumber = 289383128;
+    }
+
     let i = 0;
     while (true) {
       try {
@@ -267,18 +274,14 @@ export class BotService {
             }
             const txHash = transaction?.transaction?.signatures[0];
             if (signer && balanceChange.length > 0) {
-              this.bot_data.push({
+              const newData = {
                 bot_id: signer,
                 tx_hash: txHash,
                 profit: balanceChange,
                 fee: totalFee,
-              });
-              this.saveBotDataToCSV(
-                this.bot_data,
-                'bot_data',
-                'data_detect_bot',
-              );
-              this.saveJsonFile('bot_data_profit', this.bot_data);
+              };
+              this.saveBotDataToCSV(newData);
+              await this.saveJsonFile('bot_data_profit.json', newData);
             }
           } catch (e) {
             console.log(e);
@@ -286,7 +289,7 @@ export class BotService {
         }
         const endTime = Date.now();
         console.log('Duration : ', endTime - startTime);
-        await this.sleep(50);
+        await this.sleep(5000);
       } catch (e) {
         console.log(e);
       }

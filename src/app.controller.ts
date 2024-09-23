@@ -17,10 +17,10 @@ export class AppController {
 
   @Get('transaction')
   async getTransaction(
-    @Query('blockNumber') blockNumber: number,
+    @Query('blockNumber') blockNumber: string,
   ): Promise<any> {
     console.log('hash');
-    this.botService.getData(blockNumber);
+    this.botService.getData(parseInt(blockNumber));
     return { enableCrawl: 'true' };
   }
 }
