@@ -227,7 +227,11 @@ export class BotService {
         while (true) {
           try {
             const rpc = this.getConnect();
-            this.connection = new Connection(rpc);
+            this.connection = new Connection(rpc, {
+              httpHeaders: {
+                'Accept-Encoding': 'gzip, deflate',
+              },
+            });
             console.log('rpc', rpc);
             const result = await this.getBlock(blockOldNumber);
             block = result.block;
