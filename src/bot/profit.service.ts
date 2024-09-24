@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { HttpProxyAgent } from 'http-proxy-agent';
 import { HttpsProxyAgent } from 'https-proxy-agent';
+import { retry } from 'rxjs';
 interface IBalanceInfo {
   Txhash: string;
   BlockTimeUnix: string;
@@ -24,20 +25,29 @@ export class ProfitService {
   constructor() {}
 
   async getPrice(token_address) {
-    const proxy = `http://diemmy889980:gfH7y83JrjC7zrw8_country-UnitedStates@proxy.packetstream.io:31112`;
-    const httpAgent = new HttpProxyAgent(proxy);
-    const httpsAgent = new HttpsProxyAgent(proxy);
-    const priceData = await axios.get(
-      `https://price.jup.ag/v4/price?ids=${token_address}`,
-    );
-    let price = 0;
-    for (const key in priceData) {
-      if (priceData.hasOwnProperty(key)) {
-        price = priceData[key].price;
+    let retry = 10;
+    while (retry > 0) {
+      try {
+        const proxy = `http://diemmy889980:gfH7y83JrjC7zrw8_country-UnitedStates@proxy.packetstream.io:31112`;
+        const httpAgent = new HttpProxyAgent(proxy);
+        const httpsAgent = new HttpsProxyAgent(proxy);
+        const result = await axios.get(
+          `https://price.jup.ag/v4/price?ids=${token_address}`,
+        );
+        const priceData = result.data.data;
+        let price = 0;
+        for (const key in priceData) {
+          if (priceData.hasOwnProperty(key)) {
+            price = priceData[key].price;
+          }
+        }
+        this.priceCache.set(token_address, price);
+        return price;
+      } catch (e) {
+        retry -= 1;
+        console.log(e);
       }
     }
-    this.priceCache.set(token_address, price);
-    return price;
   }
 
   saveBotDataToCSV(
@@ -75,21 +85,32 @@ export class ProfitService {
     fs.appendFileSync(filePath, newRow, 'utf-8');
   }
 
+  async sleep(ms) {
+    return new Promise((resolve) => {
+      setTimeout(resolve, ms);
+    });
+  }
+
   async getBalanceChangeBot(
     startTime: number,
     endTime: number,
     address: string,
   ): Promise<IBalanceInfo[]> {
-    try {
-      const proxy = `http://diemmy889980:gfH7y83JrjC7zrw8_country-UnitedStates@proxy.packetstream.io:31112`;
-      const httpAgent = new HttpProxyAgent(proxy);
-      const httpsAgent = new HttpsProxyAgent(proxy);
-      process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
-      const url = `https://api-v2.solscan.io/v2/account/balance_change/export?address=${address}&block_time[]=${startTime}&block_time[]=${endTime}`;
-      const result = await axios.get(url);
-      return this.csvStringToJson(result.data);
-    } catch (e) {
-      console.log(e);
+    let retry = 10;
+    while (retry > 0) {
+      try {
+        const proxy = `http://diemmy889980:gfH7y83JrjC7zrw8_country-UnitedStates@proxy.packetstream.io:31112`;
+        const httpAgent = new HttpProxyAgent(proxy);
+        const httpsAgent = new HttpsProxyAgent(proxy);
+        process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+        const url = `https://api-v2.solscan.io/v2/account/balance_change/export?address=${address}&block_time[]=${startTime}&block_time[]=${endTime}`;
+        const result = await axios.get(url);
+        return this.csvStringToJson(result.data);
+      } catch (e) {
+        retry -= 1;
+        await this.sleep(2000);
+        console.log(e);
+      }
     }
   }
 
@@ -115,15 +136,16 @@ export class ProfitService {
 
   async getDataPerBot(botId: string, startTime: number, endTime: number) {
     console.log('getDataPerBot:', botId);
-    try {
-      let resultGetBalance = await this.getBalanceChangeBot(
-        startTime,
-        endTime,
-        botId,
-      );
-      let endTimeUpdate = 0;
-      let check = 0;
-      while (true) {
+
+    let resultGetBalance = await this.getBalanceChangeBot(
+      startTime,
+      endTime,
+      botId,
+    );
+    let endTimeUpdate = 0;
+    let check = 0;
+    while (true) {
+      try {
         if (check) {
           break;
         }
@@ -156,7 +178,7 @@ export class ProfitService {
               ((parseInt(balanceInfo.BlockTimeUnix) - endTime) * 100) /
                 (1726553363 - endTime),
             );
-            this.saveBotDataToCSV(botProfit, 'txn_bot', 'profit');
+            this.saveBotDataToCSV(botProfit, 'txn_bot_new', 'profit');
             endTimeUpdate = parseInt(balanceInfo.BlockTimeUnix);
           }
         }
@@ -168,11 +190,11 @@ export class ProfitService {
         if (resultGetBalance.length <= 0) {
           return 'Done';
         }
+      } catch (e) {
+        console.log(e);
       }
-      return 'Done';
-    } catch (e) {
-      throw e;
     }
+    return 'Done';
   }
 
   extractFirstColumnFromFile(filePath: string): string[] {
