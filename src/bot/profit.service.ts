@@ -29,7 +29,6 @@ export class ProfitService {
     const httpsAgent = new HttpsProxyAgent(proxy);
     const priceData = await axios.get(
       `https://price.jup.ag/v4/price?ids=${token_address}`,
-      { httpAgent, httpsAgent },
     );
     let price = 0;
     for (const key in priceData) {
@@ -87,7 +86,7 @@ export class ProfitService {
       const httpsAgent = new HttpsProxyAgent(proxy);
       process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
       const url = `https://api-v2.solscan.io/v2/account/balance_change/export?address=${address}&block_time[]=${startTime}&block_time[]=${endTime}`;
-      const result = await axios.get(url, { httpAgent, httpsAgent });
+      const result = await axios.get(url);
       return this.csvStringToJson(result.data);
     } catch (e) {
       console.log(e);
@@ -197,10 +196,7 @@ export class ProfitService {
       const startTime = 1726553363;
       const endTime = 1727150884;
       const bots = this.extractFirstColumnFromFile('result_check_bots.csv');
-      // const bots = [
-      //   'Awch9PiL7nwQqKNjXHzJd1KvTkFtauVqQDSjdUTqe28n',
-      //   'BEmUSjqs7mpgaSXw6QdrePfTsD8aQHbdtnqUxa63La6E',
-      // ];
+      // const bots = ['ARsCio3rdTWmiLiK9aCYKxEjQQ3zQpHHvDZhbabPRzfA'];
       const promises = bots.map(async (botId) => {
         const start = Date.now();
         const res = await this.getDataPerBot(botId, startTime, endTime);
