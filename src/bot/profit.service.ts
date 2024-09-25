@@ -143,54 +143,56 @@ export class ProfitService {
       botId,
     );
     let endTimeUpdate = 0;
-    let check = 0;
+    let checkExcept = 10;
     while (true) {
       try {
-        if (check) {
+        if (checkExcept <= 0) {
           break;
         }
-        for (const balanceInfo of resultGetBalance) {
-          if (parseInt(balanceInfo.BlockTimeUnix) < startTime) {
-            check = 1;
-            break;
-          } else {
-            const amountChange =
-              parseInt(balanceInfo.ChangeAmount) /
-              10 ** parseInt(balanceInfo.TokenDecimals);
-            let price = 1;
-            if (this.priceCache.get(balanceInfo.TokenAddress)) {
-              price = this.priceCache.get(balanceInfo.TokenAddress);
+        if (Array.isArray(resultGetBalance) && resultGetBalance.length > 0) {
+          for (const balanceInfo of resultGetBalance) {
+            if (parseInt(balanceInfo.BlockTimeUnix) < startTime) {
+              break;
             } else {
-              price = await this.getPrice(balanceInfo.TokenAddress);
+              const amountChange =
+                parseInt(balanceInfo.ChangeAmount) /
+                10 ** parseInt(balanceInfo.TokenDecimals);
+              let price = 1;
+              if (this.priceCache.get(balanceInfo.TokenAddress)) {
+                price = this.priceCache.get(balanceInfo.TokenAddress);
+              } else {
+                price = await this.getPrice(balanceInfo.TokenAddress);
+              }
+              const botProfit = {
+                bot_id: botId,
+                block_time: balanceInfo.BlockTime,
+                timestamp: balanceInfo.BlockTimeUnix,
+                tx_hash: balanceInfo.Txhash,
+                amount_change:
+                  balanceInfo.ChangeType === 'inc'
+                    ? amountChange * price
+                    : -1 * amountChange * price,
+              };
+              console.log(
+                'Percent: ',
+                ((parseInt(balanceInfo.BlockTimeUnix) - endTime) * 100) /
+                  (1726553363 - endTime),
+              );
+              this.saveBotDataToCSV(botProfit, 'txn_bot_new', 'profit');
+              endTimeUpdate = parseInt(balanceInfo.BlockTimeUnix);
             }
-            const botProfit = {
-              bot_id: botId,
-              block_time: balanceInfo.BlockTime,
-              timestamp: balanceInfo.BlockTimeUnix,
-              tx_hash: balanceInfo.Txhash,
-              amount_change:
-                balanceInfo.ChangeType === 'inc'
-                  ? amountChange * price
-                  : -1 * amountChange * price,
-            };
-            console.log(
-              'Percent: ',
-              ((parseInt(balanceInfo.BlockTimeUnix) - endTime) * 100) /
-                (1726553363 - endTime),
-            );
-            this.saveBotDataToCSV(botProfit, 'txn_bot_new', 'profit');
-            endTimeUpdate = parseInt(balanceInfo.BlockTimeUnix);
+          }
+          resultGetBalance = await this.getBalanceChangeBot(
+            startTime,
+            endTimeUpdate - 1,
+            botId,
+          );
+          if (resultGetBalance.length <= 0) {
+            return 'Done';
           }
         }
-        resultGetBalance = await this.getBalanceChangeBot(
-          startTime,
-          endTimeUpdate - 1,
-          botId,
-        );
-        if (resultGetBalance.length <= 0) {
-          return 'Done';
-        }
       } catch (e) {
+        checkExcept++;
         console.log(e);
       }
     }
