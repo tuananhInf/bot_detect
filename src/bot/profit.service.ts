@@ -178,7 +178,7 @@ export class ProfitService {
                 ((parseInt(balanceInfo.BlockTimeUnix) - endTime) * 100) /
                   (1726553363 - endTime),
               );
-              this.saveBotDataToCSV(botProfit, 'txn_bot_new', 'profit');
+              this.saveBotDataToCSV(botProfit, 'txn_bot_new_2', 'profit');
               endTimeUpdate = parseInt(balanceInfo.BlockTimeUnix);
             }
           }
